@@ -24,7 +24,7 @@ fun ConfigScreen(onGuardado: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { PrefsManager(context) }
 
-    var serverUrl by remember { mutableStateOf(prefs.serverUrl.ifBlank { "http://192.168.1.100:8080" }) }
+    var serverUrl by remember { mutableStateOf(prefs.serverUrl.ifBlank { "http://10.0.2.2:8081" }) }
     var idMesaText by remember { mutableStateOf(if (prefs.idMesa > 0) prefs.idMesa.toString() else "") }
     var errorMsg by remember { mutableStateOf("") }
 
