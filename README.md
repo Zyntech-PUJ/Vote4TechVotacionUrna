@@ -1,1 +1,0 @@
-# Vote4TechVotacionUrna
