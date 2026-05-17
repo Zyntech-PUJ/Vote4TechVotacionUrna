@@ -5,7 +5,8 @@ data class CiudadanoDto(
     val nombre: String,
     val cedula: String,
     val genero: String?,
-    val votoObligatorio: Boolean = true
+    val votoObligatorio: Boolean = true,
+    val habilitadoDomicilio: Boolean = false
 )
 
 data class EleccionDto(
@@ -44,4 +45,22 @@ data class VotoResponse(
 data class ServerInfoDto(
     val version: String?,
     val status: String?
+)
+
+data class LoginRequest(
+    val username: String,
+    val password: String
+)
+
+data class LoginResponse(
+    val exito: Boolean,
+    val nombre: String?,
+    val mensaje: String?
+)
+
+data class MesaInfoDto(
+    val idMesa: Long,
+    val numero: Int,
+    val tipo: String,
+    val centro: String?
 )

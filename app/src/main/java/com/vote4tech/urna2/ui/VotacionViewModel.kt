@@ -20,6 +20,7 @@ sealed class VotacionUiState {
     object Idle : VotacionUiState()
     object Cargando : VotacionUiState()
     data class CiudadanoIdentificado(val nombre: String) : VotacionUiState()
+    data class CiudadanoDomicilio(val nombre: String) : VotacionUiState()
     data class EleccionesListas(val elecciones: List<EleccionDto>) : VotacionUiState()
     data class CandidatosListos(val candidatos: List<CandidatoDto>) : VotacionUiState()
     data class ListoParaConfirmar(val draftId: String, val nombreCandidato: String, val nombrePartido: String?) : VotacionUiState()
@@ -27,6 +28,9 @@ sealed class VotacionUiState {
     data class Error(val mensaje: String) : VotacionUiState()
     data class DraftPendiente(val nombre: String, val eleccion: String) : VotacionUiState()
     data class YaVoto(val nombreEleccion: String) : VotacionUiState()
+    object ConectadoAlServidor : VotacionUiState()
+    data class LoginRegistradorExito(val nombre: String) : VotacionUiState()
+    data class LoginRegistradorError(val mensaje: String) : VotacionUiState()
 }
 
 class VotacionViewModel(
@@ -57,6 +61,10 @@ class VotacionViewModel(
                 val response = RetrofitClient.api.getCiudadano(cedula)
                 if (response.isSuccessful) {
                     val ciudadano = response.body()!!
+                    if (ciudadano.habilitadoDomicilio) {
+                        _uiState.value = VotacionUiState.CiudadanoDomicilio(ciudadano.nombre)
+                        return@launch
+                    }
                     val draft = VotoDraftEntity(
                         id = UUID.randomUUID().toString(),
                         cedula = ciudadano.cedula,
@@ -183,6 +191,22 @@ class VotacionViewModel(
         }
     }
 
+    fun prepararNuevaEleccionMismoCiudadano() {
+        viewModelScope.launch {
+            val old = draftActual ?: return@launch
+            val newDraft = VotoDraftEntity(
+                id = UUID.randomUUID().toString(),
+                cedula = old.cedula,
+                nombreCiudadano = old.nombreCiudadano,
+                idMesa = old.idMesa
+            )
+            votoDraftDao.limpiarEnviados()
+            votoDraftDao.insertar(newDraft)
+            draftActual = newDraft
+            cargarElecciones()
+        }
+    }
+
     fun reiniciar() {
         draftActual = null
         eleccionesCache = emptyList()
@@ -191,6 +215,45 @@ class VotacionViewModel(
 
     fun limpiarError() {
         _uiState.value = VotacionUiState.Idle
+    }
+
+    /** Verifica conectividad al servidor y emite ConectadoAlServidor (true) o false via booleano de retorno */
+    fun verificarConectividadParaConfig() {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.api.ping()
+                if (response.isSuccessful) {
+                    _uiState.value = VotacionUiState.ConectadoAlServidor
+                } else {
+                    _uiState.value = VotacionUiState.Error("sin_conexion")
+                }
+            } catch (e: Exception) {
+                _uiState.value = VotacionUiState.Error("sin_conexion")
+            }
+        }
+    }
+
+    fun loginRegistrador(username: String, password: String) {
+        viewModelScope.launch {
+            _uiState.value = VotacionUiState.Cargando
+            try {
+                val response = RetrofitClient.api.loginRegistrador(
+                    com.vote4tech.urna2.data.remote.dto.LoginRequest(username, password)
+                )
+                if (response.isSuccessful) {
+                    val body = response.body()!!
+                    if (body.exito) {
+                        _uiState.value = VotacionUiState.LoginRegistradorExito(body.nombre ?: "Registrador")
+                    } else {
+                        _uiState.value = VotacionUiState.LoginRegistradorError(body.mensaje ?: "Credenciales incorrectas")
+                    }
+                } else {
+                    _uiState.value = VotacionUiState.LoginRegistradorError("Credenciales incorrectas")
+                }
+            } catch (e: Exception) {
+                _uiState.value = VotacionUiState.LoginRegistradorError("Sin conexión: ${e.message}")
+            }
+        }
     }
 
     class Factory(

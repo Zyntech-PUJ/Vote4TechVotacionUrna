@@ -1,4 +1,4 @@
-package com.vote4tech.urna2.ui.identificacion
+﻿package com.vote4tech.urna2.ui.identificacion
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
@@ -16,15 +16,51 @@ import com.vote4tech.urna2.ui.VotacionViewModel
 @Composable
 fun IdentificacionScreen(
     viewModel: VotacionViewModel,
-    onCiudadanoIdentificado: () -> Unit
+    onCiudadanoIdentificado: () -> Unit,
+    onNavConfig: () -> Unit,
+    onNavLoginRegistrador: () -> Unit,
+    onConfigClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var cedula by remember { mutableStateOf("") }
 
+    // Show AlertDialog when citizen is domicilio
+    if (uiState is VotacionUiState.CiudadanoDomicilio) {
+        val nombre = (uiState as VotacionUiState.CiudadanoDomicilio).nombre
+        AlertDialog(
+            onDismissRequest = { viewModel.limpiarError(); cedula = "" },
+            title = { Text("Acceso Restringido") },
+            text = {
+                Text(
+                    "El ciudadano \"$nombre\" está habilitado para voto en domicilio.\n\n" +
+                    "No puede votar en urna. Por favor contáctese con la Registraduría Nacional del Estado Civil para más información."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.limpiarError(); cedula = "" }) {
+                    Text("Entendido")
+                }
+            }
+        )
+    }
+
     LaunchedEffect(uiState) {
-        if (uiState is VotacionUiState.CiudadanoIdentificado) {
-            onCiudadanoIdentificado()
-            viewModel.cargarElecciones()
+        when (val state = uiState) {
+            is VotacionUiState.CiudadanoIdentificado -> {
+                onCiudadanoIdentificado()
+                viewModel.cargarElecciones()
+            }
+            is VotacionUiState.ConectadoAlServidor -> {
+                viewModel.limpiarError()
+                onNavLoginRegistrador()
+            }
+            is VotacionUiState.Error -> {
+                if (state.mensaje == "sin_conexion") {
+                    viewModel.limpiarError()
+                    onNavConfig()
+                }
+            }
+            else -> {}
         }
     }
 
@@ -35,7 +71,7 @@ fun IdentificacionScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Identificación del Votante", style = MaterialTheme.typography.headlineMedium)
+        Text("Identificacion del Votante", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(32.dp))
 
         OutlinedTextField(
@@ -44,7 +80,7 @@ fun IdentificacionScreen(
                 cedula = it.filter { c -> c.isDigit() }
                 if (uiState is VotacionUiState.Error) viewModel.limpiarError()
             },
-            label = { Text("Número de Cédula") },
+            label = { Text("Numero de Cedula") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(
@@ -59,20 +95,20 @@ fun IdentificacionScreen(
         Spacer(Modifier.height(8.dp))
 
         if (uiState is VotacionUiState.Error) {
-            Text(
-                (uiState as VotacionUiState.Error).mensaje,
-                color = MaterialTheme.colorScheme.error
-            )
-            Spacer(Modifier.height(8.dp))
+            val errorMsg = (uiState as VotacionUiState.Error).mensaje
+            if (errorMsg != "sin_conexion") {
+                Text(errorMsg, color = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.height(8.dp))
+            }
         }
 
         if (uiState is VotacionUiState.DraftPendiente) {
             val draft = uiState as VotacionUiState.DraftPendiente
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Votación en progreso:", style = MaterialTheme.typography.labelMedium)
+                    Text("Votacion en progreso:", style = MaterialTheme.typography.labelMedium)
                     Text(draft.nombre, style = MaterialTheme.typography.bodyLarge)
-                    Text("Elección: ${draft.eleccion}")
+                    Text("Eleccion: ${draft.eleccion}")
                     Spacer(Modifier.height(8.dp))
                     Button(onClick = onCiudadanoIdentificado) { Text("Continuar") }
                 }
@@ -90,6 +126,15 @@ fun IdentificacionScreen(
             } else {
                 Text("Verificar")
             }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        OutlinedButton(
+            onClick = onConfigClick,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Configuracion")
         }
     }
 }

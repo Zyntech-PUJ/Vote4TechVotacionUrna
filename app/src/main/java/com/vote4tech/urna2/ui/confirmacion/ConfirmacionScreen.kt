@@ -13,16 +13,10 @@ import com.vote4tech.urna2.ui.VotacionViewModel
 @Composable
 fun ConfirmacionScreen(
     viewModel: VotacionViewModel,
-    onVotoCompletado: () -> Unit
+    onVotoCompletado: () -> Unit,
+    onVotarEnOtraEleccion: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-
-    LaunchedEffect(uiState) {
-        if (uiState is VotacionUiState.VotoRegistrado) {
-            viewModel.reiniciar()
-            onVotoCompletado()
-        }
-    }
 
     Column(
         modifier = Modifier
@@ -64,6 +58,53 @@ fun ConfirmacionScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Cancelar")
+                }
+            }
+            is VotacionUiState.VotoRegistrado -> {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "✅ ¡Voto registrado!",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Su voto ha sido registrado exitosamente de forma segura y anónima.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                Spacer(Modifier.height(32.dp))
+                Button(
+                    onClick = {
+                        viewModel.prepararNuevaEleccionMismoCiudadano()
+                        onVotarEnOtraEleccion()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Votar en otra elección")
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        viewModel.reiniciar()
+                        onVotoCompletado()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Salir")
                 }
             }
             is VotacionUiState.Cargando -> {

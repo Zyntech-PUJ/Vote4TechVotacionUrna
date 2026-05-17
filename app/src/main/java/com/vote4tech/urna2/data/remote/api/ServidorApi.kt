@@ -8,6 +8,9 @@ interface ServidorApi {
     @GET("config/ping")
     suspend fun ping(): Response<ServerInfoDto>
 
+    @POST("config/registrador/login")
+    suspend fun loginRegistrador(@Body request: LoginRequest): Response<LoginResponse>
+
     @GET("ciudadano/{cedula}")
     suspend fun getCiudadano(@Path("cedula") cedula: String): Response<CiudadanoDto>
 
@@ -25,4 +28,7 @@ interface ServidorApi {
 
     @POST("voto/votar")
     suspend fun votar(@Body request: VotoRequest): Response<VotoResponse>
+
+    @GET("config/mesas")
+    suspend fun getMesas(): Response<List<MesaInfoDto>>
 }

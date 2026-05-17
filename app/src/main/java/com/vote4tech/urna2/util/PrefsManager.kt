@@ -9,6 +9,8 @@ class PrefsManager(context: Context) {
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_ID_MESA = "id_mesa"
         private const val KEY_TIPO_MESA = "tipo_mesa"
+        private const val KEY_HOTSPOT_SSID = "hotspot_ssid"
+        private const val KEY_HOTSPOT_PASSWORD = "hotspot_password"
     }
 
     var serverUrl: String
@@ -22,6 +24,14 @@ class PrefsManager(context: Context) {
     var tipoMesa: String
         get() = prefs.getString(KEY_TIPO_MESA, "URNA") ?: "URNA"
         set(v) = prefs.edit().putString(KEY_TIPO_MESA, v).apply()
+
+    var hotspotSsid: String
+        get() = prefs.getString(KEY_HOTSPOT_SSID, "") ?: ""
+        set(v) = prefs.edit().putString(KEY_HOTSPOT_SSID, v).apply()
+
+    var hotspotPassword: String
+        get() = prefs.getString(KEY_HOTSPOT_PASSWORD, "") ?: ""
+        set(v) = prefs.edit().putString(KEY_HOTSPOT_PASSWORD, v).apply()
 
     val isConfigured: Boolean get() = serverUrl.isNotBlank() && idMesa > 0L
 }
