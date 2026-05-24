@@ -9,8 +9,8 @@ class PrefsManager(context: Context) {
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_ID_MESA = "id_mesa"
         private const val KEY_TIPO_MESA = "tipo_mesa"
-        private const val KEY_HOTSPOT_SSID = "hotspot_ssid"
-        private const val KEY_HOTSPOT_PASSWORD = "hotspot_password"
+        private const val KEY_CENTRO = "centro"
+        private const val KEY_IP_LOCAL = "ip_local"
     }
 
     var serverUrl: String
@@ -25,13 +25,23 @@ class PrefsManager(context: Context) {
         get() = prefs.getString(KEY_TIPO_MESA, "URNA") ?: "URNA"
         set(v) = prefs.edit().putString(KEY_TIPO_MESA, v).apply()
 
-    var hotspotSsid: String
-        get() = prefs.getString(KEY_HOTSPOT_SSID, "") ?: ""
-        set(v) = prefs.edit().putString(KEY_HOTSPOT_SSID, v).apply()
+    var centro: String
+        get() = prefs.getString(KEY_CENTRO, "") ?: ""
+        set(v) = prefs.edit().putString(KEY_CENTRO, v).apply()
 
-    var hotspotPassword: String
-        get() = prefs.getString(KEY_HOTSPOT_PASSWORD, "") ?: ""
-        set(v) = prefs.edit().putString(KEY_HOTSPOT_PASSWORD, v).apply()
+    var ipLocal: String
+        get() = prefs.getString(KEY_IP_LOCAL, "") ?: ""
+        set(v) = prefs.edit().putString(KEY_IP_LOCAL, v).apply()
 
     val isConfigured: Boolean get() = serverUrl.isNotBlank() && idMesa > 0L
+
+    fun resetConfig() {
+        prefs.edit()
+            .putString(KEY_SERVER_URL, "")
+            .putLong(KEY_ID_MESA, 0L)
+            .putString(KEY_TIPO_MESA, "URNA")
+            .putString(KEY_CENTRO, "")
+            .putString(KEY_IP_LOCAL, "")
+            .apply()
+    }
 }

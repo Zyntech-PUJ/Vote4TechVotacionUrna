@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.vote4tech.urna2.ui.VotacionUiState
@@ -18,108 +19,167 @@ fun ConfirmacionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        when (val state = uiState) {
-            is VotacionUiState.ListoParaConfirmar -> {
-                Text("Confirmar Voto", style = MaterialTheme.typography.headlineMedium)
-                Spacer(Modifier.height(32.dp))
-
-                Card(modifier = Modifier.fillMaxWidth()) {
+    when (val state = uiState) {
+        is VotacionUiState.ListoParaConfirmar -> {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                horizontalArrangement = Arrangement.spacedBy(32.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // ── Panel izquierdo: resumen del voto ──────────────────────
+                Card(modifier = Modifier.weight(1f)) {
                     Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Text("Ha seleccionado:", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "\uD83D\uDDF3\uFE0F Confirmar Voto",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        Text(
+                            "Ha seleccionado:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Spacer(Modifier.height(8.dp))
-                        Text(state.nombreCandidato, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+                        Text(
+                            state.nombreCandidato,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
                         state.nombrePartido?.let {
-                            Text(it, style = MaterialTheme.typography.bodyLarge)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                 }
-                Spacer(Modifier.height(32.dp))
 
-                Button(
-                    onClick = { viewModel.confirmarVoto() },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                // ── Panel derecho: botones ─────────────────────────────────
+                Column(
+                    modifier = Modifier.width(220.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Confirmar y Votar")
-                }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { viewModel.reiniciar(); onVotoCompletado() },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Cancelar")
+                    Button(
+                        onClick = { viewModel.confirmarVoto() },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("Confirmar y Votar")
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = { viewModel.reiniciar(); onVotoCompletado() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cancelar")
+                    }
                 }
             }
-            is VotacionUiState.VotoRegistrado -> {
+        }
+
+        is VotacionUiState.VotoRegistrado -> {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                horizontalArrangement = Arrangement.spacedBy(32.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.weight(1f)
                 ) {
                     Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            "✅ ¡Voto registrado!",
+                            "\u2705 \u00a1Voto registrado!",
                             style = MaterialTheme.typography.headlineSmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.Bold
                         )
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(12.dp))
                         Text(
-                            "Su voto ha sido registrado exitosamente de forma segura y anónima.",
+                            "Su voto ha sido registrado exitosamente de forma segura y an\u00f3nima.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             textAlign = TextAlign.Center
                         )
                     }
                 }
-                Spacer(Modifier.height(32.dp))
-                Button(
-                    onClick = {
-                        viewModel.prepararNuevaEleccionMismoCiudadano()
-                        onVotarEnOtraEleccion()
-                    },
-                    modifier = Modifier.fillMaxWidth()
+
+                Column(
+                    modifier = Modifier.width(220.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Votar en otra elección")
+                    Button(
+                        onClick = {
+                            viewModel.prepararNuevaEleccionMismoCiudadano()
+                            onVotarEnOtraEleccion()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Votar en otra elecci\u00f3n")
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.reiniciar()
+                            onVotoCompletado()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Salir")
+                    }
                 }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = {
-                        viewModel.reiniciar()
-                        onVotoCompletado()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Salir")
-                }
             }
-            is VotacionUiState.Cargando -> {
-                CircularProgressIndicator()
-                Spacer(Modifier.height(16.dp))
-                Text("Registrando voto...")
-            }
-            is VotacionUiState.Error -> {
-                Text(state.mensaje, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(16.dp))
-                Button(onClick = { viewModel.confirmarVoto() }) { Text("Reintentar") }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = { viewModel.limpiarError() }) { Text("Volver") }
-            }
-            else -> {}
         }
+
+        is VotacionUiState.Cargando -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(16.dp))
+                    Text("Registrando voto...")
+                }
+            }
+        }
+
+        is VotacionUiState.Error -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(state.mensaje, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(16.dp))
+                    Button(onClick = { viewModel.confirmarVoto() }) { Text("Reintentar") }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { viewModel.limpiarError() }) { Text("Volver") }
+                }
+            }
+        }
+
+        else -> {}
     }
 }

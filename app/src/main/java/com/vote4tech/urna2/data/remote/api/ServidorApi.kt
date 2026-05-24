@@ -11,6 +11,9 @@ interface ServidorApi {
     @POST("config/registrador/login")
     suspend fun loginRegistrador(@Body request: LoginRequest): Response<LoginResponse>
 
+    @POST("consultas/jurado/login")
+    suspend fun loginJurado(@Body request: LoginRequest): Response<LoginResponse>
+
     @GET("ciudadano/{cedula}")
     suspend fun getCiudadano(@Path("cedula") cedula: String): Response<CiudadanoDto>
 
@@ -31,4 +34,13 @@ interface ServidorApi {
 
     @GET("config/mesas")
     suspend fun getMesas(): Response<List<MesaInfoDto>>
+
+    @GET("config/hotspot")
+    suspend fun getHotspotConfig(): Response<HotspotConfigDto>
+
+    @POST("config/dispositivos/registrar")
+    suspend fun registrarDispositivo(@Body request: DispositivoRegistroRequest): Response<Void>
+
+    @GET("config/dispositivos/mi-estado")
+    suspend fun getMiEstado(@Query("deviceIp") deviceIp: String?): Response<DispositivoEstadoResponse>
 }

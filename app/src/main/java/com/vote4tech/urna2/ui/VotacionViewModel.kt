@@ -11,9 +11,15 @@ import com.vote4tech.urna2.util.PrefsManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.util.UUID
 
 sealed class VotacionUiState {
@@ -31,6 +37,7 @@ sealed class VotacionUiState {
     object ConectadoAlServidor : VotacionUiState()
     data class LoginRegistradorExito(val nombre: String) : VotacionUiState()
     data class LoginRegistradorError(val mensaje: String) : VotacionUiState()
+    object KickedPorServidor : VotacionUiState()
 }
 
 class VotacionViewModel(
@@ -41,8 +48,124 @@ class VotacionViewModel(
     private val _uiState = MutableStateFlow<VotacionUiState>(VotacionUiState.Idle)
     val uiState: StateFlow<VotacionUiState> = _uiState
 
+    // ─── Conectividad al servidor ─────────────────────────────────────────────
+    private val _serverOnline = MutableStateFlow<Boolean?>(null)
+    val serverOnline: StateFlow<Boolean?> = _serverOnline
+
+    val serverUrl: String get() = prefs.serverUrl
+    val tipoMesa: String get() = prefs.tipoMesa
+    val idMesaActual: Long get() = prefs.idMesa
+    val centroActual: String get() = prefs.centro
+
+    private var monitoringJob: Job? = null
+    private var kickPollJob: Job? = null
+
+    /** Inicia el monitoreo periódico del servidor (cada 8 s). Idempotente. */
+    fun iniciarMonitoreo() {
+        monitoringJob?.cancel()
+        monitoringJob = viewModelScope.launch {
+            while (true) {
+                _serverOnline.value = chequearServidor()
+                delay(8_000L)
+            }
+        }
+        if (prefs.isConfigured) iniciarKickPolling()
+    }
+
+    /** Detiene el monitoreo periódico. */
+    fun detenerMonitoreo() {
+        monitoringJob?.cancel()
+        monitoringJob = null
+    }
+
+    /** Registra este dispositivo en el servidor con su nombre, mesa, tipo e IP local. */
+    fun registrarDispositivo() {
+        viewModelScope.launch {
+            val ipLocal = obtenerIpLocal()
+            prefs.ipLocal = ipLocal ?: ""
+            try {
+                val request = com.vote4tech.urna2.data.remote.dto.DispositivoRegistroRequest(
+                    nombreDispositivo = android.os.Build.MODEL,
+                    idMesa = prefs.idMesa,
+                    tipoMesa = prefs.tipoMesa,
+                    centro = prefs.centro,
+                    ipLocal = ipLocal
+                )
+                RetrofitClient.api.registrarDispositivo(request)
+            } catch (_: Exception) {}
+            iniciarKickPolling()
+        }
+    }
+
+    /** Inicia el polling periódico (cada 15 s) que detecta si el admin expulsó este dispositivo. */
+    fun iniciarKickPolling() {
+        kickPollJob?.cancel()
+        kickPollJob = viewModelScope.launch {
+            while (true) {
+                delay(15_000L)
+                try {
+                    val deviceIp = prefs.ipLocal.ifBlank { null }
+                    val resp = RetrofitClient.api.getMiEstado(deviceIp)
+                    if (resp.isSuccessful && resp.body()?.activo == false) {
+                        manejarKick()
+                        break
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    private fun obtenerIpLocal(): String? {
+        return try {
+            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()?.toList() ?: return null
+            for (intf in interfaces) {
+                if (!intf.isUp || intf.isLoopback) continue
+                for (addr in intf.inetAddresses.toList()) {
+                    if (!addr.isLoopbackAddress && addr is java.net.Inet4Address) {
+                        return addr.hostAddress
+                    }
+                }
+            }
+            null
+        } catch (_: Exception) { null }
+    }
+
+    private fun manejarKick() {
+        kickPollJob?.cancel()
+        kickPollJob = null
+        prefs.resetConfig()
+        _uiState.value = VotacionUiState.KickedPorServidor
+    }
+
+    /** Dispara una verificación inmediata del servidor. */
+    fun verificarAhora() {
+        viewModelScope.launch {
+            _serverOnline.value = null   // "verificando"
+            _serverOnline.value = chequearServidor()
+        }
+    }
+
+    private suspend fun chequearServidor(): Boolean = withContext(Dispatchers.IO) {
+        val url = prefs.serverUrl
+        if (url.isBlank()) return@withContext false
+        try {
+            val parsed = java.net.URL(url)
+            val host = parsed.host
+            val port = if (parsed.port > 0) parsed.port else 8081
+            Socket().use { s ->
+                s.connect(InetSocketAddress(host, port), 2500)
+            }
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     private var draftActual: VotoDraftEntity? = null
     private var eleccionesCache: List<EleccionDto> = emptyList()
+
+    val nombreCiudadanoActual: String get() = draftActual?.nombreCiudadano ?: ""
 
     fun verificarDraftPendiente() {
         viewModelScope.launch {
@@ -75,13 +198,16 @@ class VotacionViewModel(
                     votoDraftDao.insertar(draft)
                     draftActual = draft
                     _uiState.value = VotacionUiState.CiudadanoIdentificado(ciudadano.nombre)
-                } else if (response.code() == 404) {
-                    _uiState.value = VotacionUiState.Error("Ciudadano no encontrado")
-                } else {
-                    _uiState.value = VotacionUiState.Error("Error del servidor: ${response.code()}")
+                } else when (response.code()) {
+                    404 -> _uiState.value = VotacionUiState.Error("Cédula no registrada en este sistema de votación")
+                    403 -> _uiState.value = VotacionUiState.Error("Acceso denegado por el servidor")
+                    503 -> _uiState.value = VotacionUiState.Error("Sin conexión: el servidor no está disponible en este momento")
+                    else -> _uiState.value = VotacionUiState.Error("El servidor respondió con error ${response.code()}")
                 }
+            } catch (e: java.io.IOException) {
+                _uiState.value = VotacionUiState.Error("Sin conexión: no se pudo alcanzar el servidor")
             } catch (e: Exception) {
-                _uiState.value = VotacionUiState.Error("Sin conexión: ${e.message}")
+                _uiState.value = VotacionUiState.Error("Error inesperado: ${e.localizedMessage}")
             }
         }
     }
@@ -95,10 +221,12 @@ class VotacionViewModel(
                     eleccionesCache = response.body() ?: emptyList()
                     _uiState.value = VotacionUiState.EleccionesListas(eleccionesCache)
                 } else {
-                    _uiState.value = VotacionUiState.Error("No se pudieron cargar las elecciones")
+                    _uiState.value = VotacionUiState.Error("El servidor respondió con error ${response.code()} al cargar las elecciones")
                 }
+            } catch (e: java.io.IOException) {
+                _uiState.value = VotacionUiState.Error("Sin conexión: no se pudieron cargar las elecciones del servidor")
             } catch (e: Exception) {
-                _uiState.value = VotacionUiState.Error("Sin conexión: ${e.message}")
+                _uiState.value = VotacionUiState.Error("Error inesperado al cargar elecciones: ${e.localizedMessage}")
             }
         }
     }
@@ -182,11 +310,16 @@ class VotacionViewModel(
                     votoDraftDao.actualizarEstado(draft.id, EstadoDraft.ENVIADO.name)
                     draftActual = null
                     _uiState.value = VotacionUiState.VotoRegistrado
-                } else {
-                    _uiState.value = VotacionUiState.Error("Error al registrar voto: ${response.code()}")
+                } else when (response.code()) {
+                    400 -> _uiState.value = VotacionUiState.Error("Voto no registrado: datos inválidos o cédula ya votó en esta elección")
+                    409 -> _uiState.value = VotacionUiState.Error("Esta cédula ya tiene un voto registrado en esta elección")
+                    503 -> _uiState.value = VotacionUiState.Error("Sin conexión: el servidor no está disponible — voto no registrado")
+                    else -> _uiState.value = VotacionUiState.Error("Error del servidor al registrar voto (${response.code()})")
                 }
+            } catch (e: java.io.IOException) {
+                _uiState.value = VotacionUiState.Error("Sin conexión: el voto no fue registrado — verifique la red e intente de nuevo")
             } catch (e: Exception) {
-                _uiState.value = VotacionUiState.Error("Sin conexión: ${e.message}")
+                _uiState.value = VotacionUiState.Error("Error inesperado al registrar voto: ${e.localizedMessage}")
             }
         }
     }
@@ -203,6 +336,15 @@ class VotacionViewModel(
             votoDraftDao.limpiarEnviados()
             votoDraftDao.insertar(newDraft)
             draftActual = newDraft
+            // EleccionScreen llama volverAElecciones() al entrar — no se duplica aquí
+        }
+    }
+
+    /** Muestra el caché de elecciones si existe; si no, hace fetch. Usar al volver a EleccionScreen. */
+    fun volverAElecciones() {
+        if (eleccionesCache.isNotEmpty()) {
+            _uiState.value = VotacionUiState.EleccionesListas(eleccionesCache)
+        } else {
             cargarElecciones()
         }
     }
@@ -236,23 +378,50 @@ class VotacionViewModel(
     fun loginRegistrador(username: String, password: String) {
         viewModelScope.launch {
             _uiState.value = VotacionUiState.Cargando
+            val req = com.vote4tech.urna2.data.remote.dto.LoginRequest(username, password)
+            // Intentar primero como registrador
             try {
-                val response = RetrofitClient.api.loginRegistrador(
-                    com.vote4tech.urna2.data.remote.dto.LoginRequest(username, password)
-                )
-                if (response.isSuccessful) {
-                    val body = response.body()!!
-                    if (body.exito) {
-                        _uiState.value = VotacionUiState.LoginRegistradorExito(body.nombre ?: "Registrador")
-                    } else {
-                        _uiState.value = VotacionUiState.LoginRegistradorError(body.mensaje ?: "Credenciales incorrectas")
-                    }
-                } else {
-                    _uiState.value = VotacionUiState.LoginRegistradorError("Credenciales incorrectas")
+                val resp = RetrofitClient.api.loginRegistrador(req)
+                if (resp.isSuccessful && resp.body()?.exito == true) {
+                    _uiState.value = VotacionUiState.LoginRegistradorExito(resp.body()!!.nombre ?: "Registrador")
+                    return@launch
                 }
+            } catch (e: java.io.IOException) {
+                _uiState.value = VotacionUiState.LoginRegistradorError("Sin conexión: no se pudo alcanzar el servidor")
+                return@launch
+            } catch (_: Exception) {}
+            // Intentar como jurado
+            try {
+                val resp = RetrofitClient.api.loginJurado(req)
+                if (resp.isSuccessful && resp.body()?.exito == true) {
+                    _uiState.value = VotacionUiState.LoginRegistradorExito(resp.body()!!.nombre ?: "Jurado")
+                    return@launch
+                }
+                _uiState.value = VotacionUiState.LoginRegistradorError("Usuario o contraseña incorrectos")
+            } catch (e: java.io.IOException) {
+                _uiState.value = VotacionUiState.LoginRegistradorError("Sin conexión: no se pudo alcanzar el servidor")
             } catch (e: Exception) {
-                _uiState.value = VotacionUiState.LoginRegistradorError("Sin conexión: ${e.message}")
+                _uiState.value = VotacionUiState.LoginRegistradorError("Error inesperado: ${e.localizedMessage}")
             }
+        }
+    }
+
+    fun seleccionarVotoBlanco() {
+        viewModelScope.launch {
+            val draft = draftActual ?: return@launch
+            val actualizado = draft.copy(
+                tipoSeleccion = "BLANCO",
+                idSeleccion = 0L,
+                nombreSeleccion = "Voto en Blanco",
+                estado = EstadoDraft.CANDIDATO_SELECCIONADO.name
+            )
+            votoDraftDao.actualizar(actualizado)
+            draftActual = actualizado
+            _uiState.value = VotacionUiState.ListoParaConfirmar(
+                draftId = actualizado.id,
+                nombreCandidato = "Voto en Blanco",
+                nombrePartido = null
+            )
         }
     }
 

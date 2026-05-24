@@ -64,3 +64,22 @@ data class MesaInfoDto(
     val tipo: String,
     val centro: String?
 )
+
+data class HotspotConfigDto(
+    val ssid: String?,
+    val password: String?,
+    val canal: Int?,
+    val puerto: Int?
+)
+
+data class DispositivoRegistroRequest(
+    val nombreDispositivo: String,
+    val idMesa: Long,
+    val tipoMesa: String,
+    val centro: String?,
+    val ipLocal: String?
+)
+
+data class DispositivoEstadoResponse(
+    val activo: Boolean
+)

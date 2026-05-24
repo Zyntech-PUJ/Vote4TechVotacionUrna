@@ -5,7 +5,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.vote4tech.urna2.ui.VotacionUiState
 import com.vote4tech.urna2.ui.VotacionViewModel
@@ -26,60 +29,92 @@ fun LoginRegistradorScreen(
         }
     }
 
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(32.dp),
+        horizontalArrangement = Arrangement.spacedBy(40.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("Acceso de Registrador", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Para acceder a la configuración, un registrador electoral debe autenticarse.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(32.dp))
-
-        OutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
-            label = { Text("Usuario") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-        Spacer(Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Contraseña") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            isError = uiState is VotacionUiState.LoginRegistradorError
-        )
-        Spacer(Modifier.height(8.dp))
-
-        if (uiState is VotacionUiState.LoginRegistradorError) {
+        // ── Panel izquierdo: descripción ──────────────────────────────────────
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text("🔐", style = MaterialTheme.typography.displayLarge)
+            Spacer(Modifier.height(16.dp))
             Text(
-                (uiState as VotacionUiState.LoginRegistradorError).mensaje,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall
+                "Acceso de\nRegistrador o Jurado",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(8.dp))
+            Text(
+                "Ingresa tus credenciales de registrador o jurado para acceder al panel de administración.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
 
-        Button(
-            onClick = { viewModel.loginRegistrador(username, password) },
-            enabled = username.isNotBlank() && password.isNotBlank() && uiState !is VotacionUiState.Cargando,
-            modifier = Modifier.fillMaxWidth()
+        // ── Panel derecho: formulario ─────────────────────────────────────────
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
         ) {
-            if (uiState is VotacionUiState.Cargando) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            } else {
-                Text("Ingresar")
+            OutlinedTextField(
+                value = username,
+                onValueChange = { username = it },
+                label = { Text("Usuario") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Contraseña") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                isError = uiState is VotacionUiState.LoginRegistradorError
+            )
+            if (uiState is VotacionUiState.LoginRegistradorError) {
+                val errMsg = (uiState as VotacionUiState.LoginRegistradorError).mensaje
+                val esSinConexion = errMsg.startsWith("Sin conexión")
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(if (esSinConexion) "🔌" else "🔑", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        errMsg,
+                        color = if (esSinConexion) Color(0xFFBF360C) else MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = { viewModel.loginRegistrador(username, password) },
+                enabled = username.isNotBlank() && password.isNotBlank() && uiState !is VotacionUiState.Cargando,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (uiState is VotacionUiState.Cargando) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Ingresar")
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { viewModel.limpiarError(); /* navController.popBackStack via callback not needed here */ },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Cancelar")
             }
         }
     }
