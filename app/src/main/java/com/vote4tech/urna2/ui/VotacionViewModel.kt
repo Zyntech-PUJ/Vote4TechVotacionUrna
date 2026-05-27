@@ -52,6 +52,9 @@ class VotacionViewModel(
     private val _serverOnline = MutableStateFlow<Boolean?>(null)
     val serverOnline: StateFlow<Boolean?> = _serverOnline
 
+    private val _autoSincronizando = MutableStateFlow(false)
+    val autoSincronizando: StateFlow<Boolean> = _autoSincronizando
+
     val serverUrl: String get() = prefs.serverUrl
     val tipoMesa: String get() = prefs.tipoMesa
     val idMesaActual: Long get() = prefs.idMesa
@@ -346,6 +349,20 @@ class VotacionViewModel(
             _uiState.value = VotacionUiState.EleccionesListas(eleccionesCache)
         } else {
             cargarElecciones()
+        }
+    }
+
+    fun sincronizarAuto() {
+        if (_autoSincronizando.value) return
+        viewModelScope.launch {
+            _autoSincronizando.value = true
+            try {
+                RetrofitClient.api.syncDescargar()
+                RetrofitClient.api.syncSubir()
+            } catch (_: Exception) { /* servidor local puede no ser alcanzable aún */ }
+            finally {
+                _autoSincronizando.value = false
+            }
         }
     }
 

@@ -43,4 +43,10 @@ interface ServidorApi {
 
     @GET("config/dispositivos/mi-estado")
     suspend fun getMiEstado(@Query("deviceIp") deviceIp: String?): Response<DispositivoEstadoResponse>
+
+    @POST("sync/descargar")
+    suspend fun syncDescargar(): Response<Unit>
+
+    @POST("sync/subir")
+    suspend fun syncSubir(): Response<Unit>
 }

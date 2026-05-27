@@ -1,9 +1,14 @@
 package com.vote4tech.urna2.ui
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -40,6 +45,7 @@ fun VotacionNavHost(
 ) {
     val navController = rememberNavController()
     val uiState by viewModel.uiState.collectAsState()
+    val autoSincronizando by viewModel.autoSincronizando.collectAsState()
 
     LaunchedEffect(uiState) {
         if (uiState is VotacionUiState.KickedPorServidor) {
@@ -50,101 +56,132 @@ fun VotacionNavHost(
         }
     }
 
-    NavHost(navController = navController, startDestination = startDestination) {
-        composable(Routes.CONFIG) {
-            ConfigScreen(
-                prefs = prefs,
-                onConfigGuardada = {
-                    navController.navigate(Routes.IDENTIFICACION) {
-                        popUpTo(Routes.CONFIG) { inclusive = true }
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(navController = navController, startDestination = startDestination) {
+            composable(Routes.CONFIG) {
+                ConfigScreen(
+                    prefs = prefs,
+                    onConfigGuardada = {
+                        navController.navigate(Routes.IDENTIFICACION) {
+                            popUpTo(Routes.CONFIG) { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable(Routes.IDENTIFICACION) {
+                IdentificacionScreen(
+                    viewModel = viewModel,
+                    onCiudadanoIdentificado = { navController.navigate(Routes.HUELLA) },
+                    onNavLoginRegistrador = {
+                        navController.navigate(Routes.LOGIN_REGISTRADOR)
+                    }
+                )
+            }
+            composable(Routes.HUELLA) {
+                HuellaScreen(
+                    viewModel = viewModel,
+                    onSiguiente = {
+                        navController.navigate(Routes.ELECCION) {
+                            popUpTo(Routes.HUELLA) { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable(Routes.LOGIN_REGISTRADOR) {
+                LoginRegistradorScreen(
+                    viewModel = viewModel,
+                    onLoginExito = {
+                        navController.navigate(Routes.DASHBOARD) {
+                            popUpTo(Routes.LOGIN_REGISTRADOR) { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable(Routes.DASHBOARD) {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    onNavConexion = {
+                        navController.navigate(Routes.CONEXION_SERVIDOR)
+                    },
+                    onNavInstrucciones = {
+                        navController.navigate(Routes.INSTRUCCIONES)
+                    },
+                    onBack = {
+                        viewModel.limpiarError()
+                        navController.navigate(Routes.IDENTIFICACION) {
+                            popUpTo(Routes.IDENTIFICACION) { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable(Routes.CONEXION_SERVIDOR) {
+                ConexionServidorScreen(
+                    viewModel = viewModel,
+                    prefs = prefs,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Routes.INSTRUCCIONES) {
+                InstruccionesScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Routes.ELECCION) {
+                EleccionScreen(
+                    viewModel = viewModel,
+                    onEleccionSeleccionada = { navController.navigate(Routes.VOTACION) }
+                )
+            }
+            composable(Routes.VOTACION) {
+                VotacionScreen(
+                    viewModel = viewModel,
+                    onCandidatoSeleccionado = { navController.navigate(Routes.CONFIRMACION) }
+                )
+            }
+            composable(Routes.CONFIRMACION) {
+                ConfirmacionScreen(
+                    viewModel = viewModel,
+                    onVotoCompletado = {
+                        navController.navigate(Routes.IDENTIFICACION) {
+                            popUpTo(Routes.IDENTIFICACION) { inclusive = true }
+                        }
+                    },
+                    onVotarEnOtraEleccion = {
+                        navController.navigate(Routes.ELECCION) {
+                            popUpTo(Routes.ELECCION) { inclusive = true }
+                        }
+                    }
+                )
+            }
+        }
+
+        // ── Overlay de auto-sincronización ─────────────────────────────────────
+        if (autoSincronizando) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.65f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(modifier = Modifier.padding(32.dp)) {
+                    Column(
+                        modifier = Modifier.padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator()
+                        Text(
+                            "Se detectó internet",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Sincronizando todo...",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
                 }
-            )
-        }
-        composable(Routes.IDENTIFICACION) {
-            IdentificacionScreen(
-                viewModel = viewModel,
-                onCiudadanoIdentificado = { navController.navigate(Routes.HUELLA) },
-                onNavLoginRegistrador = {
-                    navController.navigate(Routes.LOGIN_REGISTRADOR)
-                }
-            )
-        }
-        composable(Routes.HUELLA) {
-            HuellaScreen(
-                viewModel = viewModel,
-                onSiguiente = {
-                    navController.navigate(Routes.ELECCION) {
-                        popUpTo(Routes.HUELLA) { inclusive = true }
-                    }
-                }
-            )
-        }
-        composable(Routes.LOGIN_REGISTRADOR) {
-            LoginRegistradorScreen(
-                viewModel = viewModel,
-                onLoginExito = {
-                    navController.navigate(Routes.DASHBOARD) {
-                        popUpTo(Routes.LOGIN_REGISTRADOR) { inclusive = true }
-                    }
-                }
-            )
-        }
-        composable(Routes.DASHBOARD) {
-            DashboardScreen(
-                viewModel = viewModel,
-                onNavConexion = {
-                    navController.navigate(Routes.CONEXION_SERVIDOR)
-                },
-                onNavInstrucciones = {
-                    navController.navigate(Routes.INSTRUCCIONES)
-                },
-                onBack = {
-                    viewModel.limpiarError()
-                    navController.navigate(Routes.IDENTIFICACION) {
-                        popUpTo(Routes.IDENTIFICACION) { inclusive = true }
-                    }
-                }
-            )
-        }
-        composable(Routes.CONEXION_SERVIDOR) {
-            ConexionServidorScreen(
-                viewModel = viewModel,
-                prefs = prefs,
-                onBack = { navController.popBackStack() }
-            )
-        }
-        composable(Routes.INSTRUCCIONES) {
-            InstruccionesScreen(
-                onBack = { navController.popBackStack() }
-            )
-        }
-        composable(Routes.ELECCION) {
-            EleccionScreen(
-                viewModel = viewModel,
-                onEleccionSeleccionada = { navController.navigate(Routes.VOTACION) }
-            )
-        }
-        composable(Routes.VOTACION) {
-            VotacionScreen(
-                viewModel = viewModel,
-                onCandidatoSeleccionado = { navController.navigate(Routes.CONFIRMACION) }
-            )
-        }
-        composable(Routes.CONFIRMACION) {
-            ConfirmacionScreen(
-                viewModel = viewModel,
-                onVotoCompletado = {
-                    navController.navigate(Routes.IDENTIFICACION) {
-                        popUpTo(Routes.IDENTIFICACION) { inclusive = true }
-                    }
-                },
-                onVotarEnOtraEleccion = {
-                    navController.navigate(Routes.ELECCION) {
-                        popUpTo(Routes.ELECCION) { inclusive = true }
-                    }
-                }
-            )
+            }
         }
     }
 }
